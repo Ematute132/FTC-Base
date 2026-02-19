@@ -14,6 +14,12 @@ import kotlin.math.sin
 class Drivetrain(private val follower: Follower) {
     
     /**
+     * Current pose - always returns latest position (updates automatically)
+     */
+    val currentPose: Pose
+        get() = follower.pose
+    
+    /**
      * Get current pose (x, y, heading in radians)
      */
     fun pose(): Pose = follower.pose
