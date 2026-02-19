@@ -4,25 +4,56 @@
 // Most of the definitions for building your module reside in a common, shared
 // file 'build.common.gradle'. Being factored in this way makes it easier to
 // integrate updates to the FTC into your code. If you really need to customize
-// the build definitions, you can place those customizations in this file, but
-// please think carefully as to whether such customizations are really necessary
-// before doing so.
+// these customizations in this file, but please think carefully as to whether
+// such customizations are really necessary before doing so.
 
-
-// Custom definitions may go here
 
 // Include common definitions from above.
 apply from: '../build.common.gradle'
 apply from: '../build.dependencies.gradle'
 
+// Kotlin support
+apply plugin: 'org.jetbrains.kotlin.android'
+
 android {
     namespace = 'org.firstinspires.ftc.teamcode'
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
 
     packagingOptions {
         jniLibs.useLegacyPackaging true
     }
 }
 
+repositories {
+    mavenCentral()
+    google()
+    maven { url = "https://mymaven.bylazar.com/releases" }
+    maven { url = "https://repo.dairy.foundation/releases" }
+    maven { url = "https://repo.dairy.foundation/snapshots" }
+}
+
 dependencies {
     implementation project(':FtcRobotController')
+
+    // Pedro Pathing
+    implementation 'com.pedropathing:ftc:2.0.6'
+    implementation 'com.pedropathing:telemetry:1.0.0'
+
+    // Panels by Lazar
+    implementation 'com.bylazar:fullpanels:1.0.9'
+
+    // NextFTC Core
+    implementation 'dev.nextftc:ftc:1.1.0-beta.4'
+    implementation 'dev.nextftc:hardware:1.1.0-beta.4'
+
+    // NextBindings (gamepad input)
+    implementation 'dev.nextftc:bindings:1.0.1'
+
+    // NextControl (PID, feedforward)
+    implementation 'dev.nextftc:control:1.0.0'
+
+    // NextFTC Pedro Extension
+    implementation 'dev.nextftc.extensions:pedro:1.0.0'
 }
