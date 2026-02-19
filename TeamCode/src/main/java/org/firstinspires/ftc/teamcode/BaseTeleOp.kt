@@ -9,6 +9,7 @@ import dev.nextftc.ftc.NextFTCOpMode
 import dev.nextftc.extensions.pedro.PedroComponent
 import dev.nextftc.extensions.pedro.PedroDriverControlled
 import dev.nextftc.hardware.driving.DriverControlledCommand
+import org.firstinspires.ftc.teamcode.subsystem.Flywheel
 import org.firstinspires.ftc.teamcode.subsystem.Gate
 import org.firstinspires.ftc.teamcode.subsystem.Intake
 
@@ -23,7 +24,8 @@ class BaseTeleOp : NextFTCOpMode() {
     init {
         addComponents(
             SubsystemComponent(Intake),
-            SubsystemComponent(Gate)
+            SubsystemComponent(Gate),
+            SubsystemComponent(Flywheel)
         )
     }
 
@@ -81,6 +83,14 @@ class BaseTeleOp : NextFTCOpMode() {
         // Right bumper = open gate
         Gamepads.gamepad1.rightBumper
             .whenBecomesTrue { Gate.open }
+            
+        // D-pad up = start flywheel
+        Gamepads.gamepad1.dpadUp
+            .whenBecomesTrue { Flywheel.setTargetRPM(Flywheel.targetRPM) }
+            
+        // D-pad down = stop flywheel
+        Gamepads.gamepad1.dpadDown
+            .whenBecomesTrue { Flywheel.stop() }
     }
 
     override fun onUpdate() {
@@ -99,6 +109,11 @@ class BaseTeleOp : NextFTCOpMode() {
 
         // Subsystems
         panelsTelemetry.addLine("Intake: ${Intake.getState()}")
+        
+        // Flywheel telemetry
+        panelsTelemetry.addLine("Flywheel Target: %.0f RPM".format(Flywheel.getTargetRPM()))
+        panelsTelemetry.addLine("Flywheel Actual: %.0f RPM".format(Flywheel.getCurrentRPM()))
+        panelsTelemetry.addLine("Flywheel State: ${Flywheel.getState()}")
 
         // Update both Driver Station and Panels
         panelsTelemetry.update(telemetry)
