@@ -1,74 +1,68 @@
 package org.firstinspires.ftc.teamcode.subsystem
 
-import kotlin.math.PI
-
 /**
  * Field dimensions (FTC standard field: 12ft x 12ft = 144" x 144")
  */
 object FieldConstants {
-    const val FIELD_WIDTH = 144.0  // inches
-    const val FIELD_HEIGHT = 144.0 // inches
+    const val FIELD_WIDTH = 144.0
+    const val FIELD_HEIGHT = 144.0
     
-    // Define your team's starting position
-    val START_POSE = Pose(0.0, 0.0, 0.0) // adjust as needed
+    // Adjust to match your starting position
+    val START_POSE = RobotPose(0.0, 0.0, 0.0)
 }
 
 /**
  * Predefined shooting zones
- * Adjust coordinates to match your field setup
+ * Adjust coordinates to match your field/hub position
  */
 object ShootingZones {
     
     /**
-     * Example: Standard FTC shooting zone near the hub
-     * Adjust vertices to match your auto line and desired shooting positions
+     * Main shooting zone near the hub
      */
     val MAIN_ZONE = ShootingZone(listOf(
-        Pose(0.0, 0.0),       // bottom-left corner of zone
-        Pose(48.0, 0.0),      // bottom-right
-        Pose(48.0, 36.0),     // top-right
-        Pose(0.0, 36.0)       // top-left
+        RobotPose(0.0, 0.0),
+        RobotPose(48.0, 0.0),
+        RobotPose(48.0, 36.0),
+        RobotPose(0.0, 36.0)
     ))
     
     /**
-     * Close range shooting zone (near hub)
+     * Close range (right against hub)
      */
     val CLOSE_ZONE = ShootingZone(listOf(
-        Pose(0.0, 0.0),
-        Pose(24.0, 0.0),
-        Pose(24.0, 24.0),
-        Pose(0.0, 24.0)
+        RobotPose(0.0, 0.0),
+        RobotPose(24.0, 0.0),
+        RobotPose(24.0, 24.0),
+        RobotPose(0.0, 24.0)
     ))
     
     /**
-     * Mid-range shooting zone
+     * Mid-range
      */
     val MID_ZONE = ShootingZone(listOf(
-        Pose(24.0, 0.0),
-        Pose(48.0, 0.0),
-        Pose(48.0, 24.0),
-        Pose(24.0, 24.0)
+        RobotPose(24.0, 0.0),
+        RobotPose(48.0, 0.0),
+        RobotPose(48.0, 24.0),
+        RobotPose(24.0, 24.0)
     ))
     
     /**
-     * Far shooting zone (auto line)
+     * Far range (auto line)
      */
     val FAR_ZONE = ShootingZone(listOf(
-        Pose(48.0, 0.0),
-        Pose(72.0, 0.0),
-        Pose(72.0, 36.0),
-        Pose(48.0, 36.0)
+        RobotPose(48.0, 0.0),
+        RobotPose(72.0, 0.0),
+        RobotPose(72.0, 36.0),
+        RobotPose(48.0, 36.0)
     ))
     
-    /**
-     * Get all zones as a list
-     */
     val ALL_ZONES = listOf(CLOSE_ZONE, MID_ZONE, FAR_ZONE)
     
     /**
-     * Find which zone the robot is in (if any)
+     * Get which zone robot is in
      */
-    fun getZone(pose: Pose): String {
+    fun getZone(pose: RobotPose): String {
         return when {
             CLOSE_ZONE.contains(pose) -> "CLOSE"
             MID_ZONE.contains(pose) -> "MID"
@@ -79,13 +73,12 @@ object ShootingZones {
     }
     
     /**
-     * Get distance to closest zone center
+     * Distance to nearest zone
      */
-    fun distanceToZone(pose: Pose): Double {
+    fun distanceToZone(pose: RobotPose): Double {
         var minDist = Double.MAX_VALUE
         for (zone in ALL_ZONES) {
-            val dist = zone.distanceTo(pose)
-            minDist = min(minDist, dist)
+            minDist = min(minDist, zone.distanceTo(pose))
         }
         return minDist
     }

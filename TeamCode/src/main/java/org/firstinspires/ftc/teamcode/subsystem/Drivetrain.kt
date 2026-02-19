@@ -1,21 +1,28 @@
 package org.firstinspires.ftc.teamcode.subsystem
 
-import dev.nextftc.core.subsystems.Subsystem
-import dev.nextftc.hardware.impl.MotorEx
-import dev.nextftc.hardware.impl.IMU
-import dev.nextftc.core.units.Angle
-import dev.nextftc.core.units.angle
-import kotlin.math.*
+import com.pedropathing.follower.Follower
+import com.pedropathing.localization.Pose
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
+import kotlin.math.pow
 
 /**
- * 2D Pose: position and heading
+ * 2D Pose wrapper around Pedro's Pose
  */
-data class Pose(
-    var x: Double = 0.0,      // inches
-    var y: Double = 0.0,      // inches
-    var heading: Double = 0.0 // radians
+data class RobotPose(
+    var x: Double = 0.0,
+    var y: Double = 0.0,
+    var heading: Double = 0.0
 ) {
-    fun distanceTo(other: Pose): Double {
+    fun toPedro(): Pose = Pose(x, y, heading)
+    
+    companion object {
+        fun fromPedro(pose: Pose): RobotPose = RobotPose(pose.getX(), pose.getY(), pose.getHeading())
+    }
+    
+    fun distanceTo(other: RobotPose): Double {
         return sqrt((x - other.x).pow(2) + (y - other.y).pow(2))
     }
 }
@@ -24,13 +31,12 @@ data class Pose(
  * Shooting zone defined by polygon vertices
  * Uses ray casting algorithm for point-in-polygon detection
  */
-class ShootingZone(private val vertices: List<Pose>) {
+class ShootingZone(private val vertices: List<RobotPose>) {
     
     /**
      * Check if a point is inside the polygon using ray casting
-     * Works for any convex or concave polygon
      */
-    fun contains(pose: Pose): Boolean = contains(pose.x, pose.y)
+    fun contains(pose: RobotPose): Boolean = contains(pose.x, pose.y)
     
     fun contains(x: Double, y: Double): Boolean {
         if (vertices.size < 3) return false
@@ -44,7 +50,6 @@ class ShootingZone(private val vertices: List<Pose>) {
             val xj = vertices[j].x
             val yj = vertices[j].y
             
-            // Ray casting algorithm
             val intersect = ((yi > y) != (yj > y)) &&
                     (x < (xj - xi) * (y - yi) / (yj - yi) + xi)
             
@@ -55,19 +60,13 @@ class ShootingZone(private val vertices: List<Pose>) {
         return inside
     }
     
-    /**
-     * Get center of shooting zone (for distance calculations)
-     */
-    fun center(): Pose {
+    fun center(): RobotPose {
         val avgX = vertices.map { it.x }.average()
         val avgY = vertices.map { it.y }.average()
-        return Pose(avgX, avgY)
+        return RobotPose(avgX, avgY)
     }
     
-    /**
-     * Distance from pose to nearest point in zone
-     */
-    fun distanceTo(pose: Pose): Double {
+    fun distanceTo(pose: RobotPose): Double {
         if (contains(pose)) return 0.0
         
         var minDist = Double.MAX_VALUE
@@ -105,119 +104,95 @@ class ShootingZone(private val vertices: List<Pose>) {
 }
 
 /**
- * Drivetrain with odometry and pose tracking
- * Uses 3 dead wheels + IMU for accurate position/heading
+ * Drivetrain using PedroPathing for odometry
+ * Wraps Pedro's follower for pose tracking
  */
-class Drivetrain : Subsystem {
+class Drivetrain(private val follower: Follower) {
     
-    // Motors (configure your encoder ports)
-    private val leftEncoder = MotorEx("encoderLeft")
-    private val rightEncoder = MotorEx("encoderRight")
-    private val strafeEncoder = MotorEx("encoderStrafe")
-    
-    // IMU for heading
-    private val imu = IMU("imu")
-    
-    // Odometry wheel positions (in inches from robot center)
-    private val leftOffset = -6.0   // adjust for your bot
-    private val rightOffset = 6.0
-    private val strafeOffset = 6.0
-    
-    // Wheel ticks per inch (calculate from your gear ratio)
-    private val ticksPerInch = 317.97 // example: 537.7 ticks/rev / (4π inch/rev)
-    
-    // Current pose
-    var pose = Pose()
-        private set
-    
-    // Previous encoder values
-    private var prevLeft = 0.0
-    private var prevRight = 0.0
-    private var prevStrafe = 0.0
-    private var prevHeading = 0.0
-    
-    // Velocity tracking
-    var velocityX = 0.0
-        private set
-    var velocityY = 0.0
-        private set
-    var angularVelocity = 0.0
-        private set
-    
-    // Filter for smoothing
-    private val velocityAlpha = 0.3
-    
-    override fun periodic() {
-        // Get current encoder values
-        val currentLeft = leftEncoder.currentPosition.toDouble()
-        val currentRight = rightEncoder.currentPosition.toDouble()
-        val currentStrafe = strafeEncoder.currentPosition.toDouble()
-        
-        // Get heading from IMU
-        val currentHeading = imu.robotHeading.angle.toRadians()
-        
-        // Calculate deltas
-        val dLeft = (currentLeft - prevLeft) / ticksPerInch
-        val dRight = (currentRight - prevRight) / ticksPerInch
-        val dStrafe = (currentStrafe - prevStrafe) / ticksPerInch
-        val dHeading = currentHeading - prevHeading
-        
-        // Handle heading wraparound
-        val dHeadingNormalized = when {
-            dHeading > PI -> dHeading - 2 * PI
-            dHeading < -PI -> dHeading + 2 * PI
-            else -> dHeading
-        }
-        
-        // Robot-centric displacement
-        val robotDx = (dLeft + dRight) / 2.0
-        val robotDy = dStrafe
-        
-        // Transform to field-centric using current heading
-        pose.x += robotDx * cos(pose.heading) - robotDy * sin(pose.heading)
-        pose.y += robotDx * sin(pose.heading) + robotDy * cos(pose.heading)
-        pose.heading = (pose.heading + dHeadingNormalized) % (2 * PI)
-        
-        // Calculate velocities
-        val dx = robotDx * cos(pose.heading) - robotDy * sin(pose.heading)
-        val dy = robotDx * sin(pose.heading) + robotDy * cos(pose.heading)
-        
-        velocityX = velocityAlpha * dx + (1 - velocityAlpha) * velocityX
-        velocityY = velocityAlpha * dy + (1 - velocityAlpha) * velocityY
-        angularVelocity = velocityAlpha * dHeadingNormalized + (1 - velocityAlpha) * angularVelocity
-        
-        // Store previous values
-        prevLeft = currentLeft
-        prevRight = currentRight
-        prevStrafe = currentStrafe
-        prevHeading = currentHeading
+    /**
+     * Get current robot pose from Pedro
+     */
+    fun getPose(): RobotPose {
+        val pose = follower.pose
+        return RobotPose(pose.getX(), pose.getY(), pose.getHeading())
     }
     
     /**
-     * Reset pose to specific position and heading
+     * Get velocity X (inches/sec)
      */
-    fun resetPose(newPose: Pose) {
-        pose = newPose
-        prevLeft = leftEncoder.currentPosition.toDouble()
-        prevRight = rightEncoder.currentPosition.toDouble()
-        prevStrafe = strafeEncoder.currentPosition.toDouble()
-        prevHeading = imu.robotHeading.angle.toRadians()
-    }
+    fun getVelocityX(): Double = follower.velocityX
     
     /**
-     * Reset to origin facing forward
+     * Get velocity Y (inches/sec)
      */
-    fun reset() {
-        resetPose(Pose(0.0, 0.0, 0.0))
-    }
+    fun getVelocityY(): Double = follower.velocityY
     
     /**
-     * Get velocity magnitude
+     * Get speed magnitude (inches/sec)
      */
-    fun getSpeed(): Double = sqrt(velocityX.pow(2) + velocityY.pow(2))
+    fun getSpeed(): Double = sqrt(follower.velocityX.pow(2) + follower.velocityY.pow(2))
+    
+    /**
+     * Get angular velocity (radians/sec)
+     */
+    fun getAngularVelocity(): Double = follower.angularVelocity
     
     /**
      * Get heading in degrees
      */
-    fun getHeadingDegrees(): Double = Math.toDegrees(pose.heading)
+    fun getHeadingDegrees(): Double = Math.toDegrees(follower.pose.getHeading())
+    
+    /**
+     * Update Pedro follower (call this in periodic)
+     */
+    fun update() {
+        follower.update()
+    }
+    
+    /**
+     * Reset pose to specific position
+     */
+    fun resetPose(x: Double, y: Double, heading: Double) {
+        follower.resetPose(Pose(x, y, heading))
+    }
+    
+    /**
+     * Reset to origin
+     */
+    fun reset() {
+        follower.resetPose(Pose(0.0, 0.0, 0.0))
+    }
+    
+    /**
+     * Start path following
+     */
+    fun followPath(path: com.pedropathing.paths.Path, interruptable: Boolean = true) {
+        follower.followPath(path, interruptable)
+    }
+    
+    /**
+     * Check if currently following a path
+     */
+    fun isBusy(): Boolean = follower.isBusy()
+    
+    /**
+     * Turn to specific angle
+     */
+    fun turnTo(angle: Double) {
+        follower.turn(angle)
+    }
+    
+    /**
+     * Set drive motor powers directly
+     */
+    fun setDrivePowers(frontLeft: Double, frontRight: Double, backLeft: Double, backRight: Double) {
+        follower.setMotorPowers(frontLeft, frontRight, backLeft, backRight)
+    }
+    
+    /**
+     * Stop all motors
+     */
+    fun stop() {
+        follower.stop()
+    }
 }
