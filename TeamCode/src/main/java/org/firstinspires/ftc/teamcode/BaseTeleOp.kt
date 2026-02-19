@@ -8,6 +8,8 @@ import dev.nextftc.ftc.NextFTCOpMode
 import dev.nextftc.extensions.pedro.PedroComponent
 import dev.nextftc.extensions.pedro.PedroDriverControlled
 import dev.nextftc.hardware.driving.DriverControlledCommand
+import org.firstinspires.ftc.teamcode.subsystem.Gate
+import org.firstinspires.ftc.teamcode.subsystem.Intake
 
 /**
  * Base TeleOp for FTC Robot
@@ -21,11 +23,6 @@ class BaseTeleOp : NextFTCOpMode() {
     private val panelsTelemetry: TelemetryManager by lazy { 
         TelemetryManager() 
     }
-
-    // Robot subsystems - add your subsystems here
-    // private lateinit var drive: Drive
-    // private lateinit var intake: Intake
-    // private lateinit var shooter: Shooter
 
     // Pedro Pathing follower
     private val follower by lazy { PedroComponent.follower }
@@ -41,10 +38,9 @@ class BaseTeleOp : NextFTCOpMode() {
     }
 
     override fun onInit() {
-        // Initialize subsystems here
-        // drive = Drive(hardwareMap)
-        // intake = Intake(hardwareMap)
-        // shooter = Shooter(hardwareMap)
+        // Initialize subsystems
+        Gate.initialize(hardwareMap)
+        Intake.initialize(hardwareMap)
 
         // Initialize Pedro Pathing - set starting pose
         follower.setStartingPose(Pose(0.0, 0.0, 0.0))
@@ -57,38 +53,37 @@ class BaseTeleOp : NextFTCOpMode() {
         // Start drivetrain
         drivetrain.schedule()
 
-        // Gamepad controls - customize for your robot
+        // Gamepad controls
         setupGamepadControls()
     }
 
     private fun setupGamepadControls() {
-        // Example controls - modify for your robot
-
-        // Gamepad 1 - Drivetrain (already scheduled above)
-        // Use gamepad1.leftStickX/Y for movement
-        // Use gamepad1.rightStickX for rotation
-
-        // Slow mode with bumper
+        // Drivetrain
+        // Slow mode with left bumper
         Gamepads.gamepad1.leftBumper
             .toggleOnBecomesTrue()
             .whenBecomesTrue { drivetrain.scalar = 0.5 }
             .whenBecomesFalse { drivetrain.scalar = 1.0 }
 
-        // Gamepad 2 - Mechanisms
-        // Uncomment and customize:
-        // Gamepads.gamepad2.a.whenBecomesTrue { intake.run() }
-        // Gamepads.gamepad2.b.whenBecomesTrue { shooter.shoot() }
-        // Gamepads.gamepad2.x.whenBecomesTrue { shooter.stop() }
+        // Intake control with triggers
+        // Right trigger = intake
+        Gamepads.gamepad1.rightTrigger.greaterThan(0.0)
+            .whenBecomesTrue { Intake.run() }
+            .whenBecomesFalse { Intake.stop() }
+
+        // Left trigger = outtake
+        Gamepads.gamepad1.leftTrigger.greaterThan(0.0)
+            .whenBecomesTrue { Intake.outtake() }
+            .whenBecomesFalse { Intake.stop() }
+
+        // Right bumper = toggle gate
+        Gamepads.gamepad1.rightBumper
+            .whenBecomesTrue { Gate.toggle() }
     }
 
     override fun onUpdate() {
         // Update Pedro Pathing follower
         follower.update()
-
-        // Update subsystems
-        // drive.update()
-        // intake.update()
-        // shooter.update()
 
         // Send telemetry to both Driver Station and Panels
         updateTelemetry()
@@ -100,9 +95,9 @@ class BaseTeleOp : NextFTCOpMode() {
         panelsTelemetry.addLine("Y: %.1f".format(follower.pose.y))
         panelsTelemetry.addLine("Heading: %.1f".format(Math.toDegrees(follower.pose.heading)))
 
-        // Debug info - customize for your robot
-        // panelsTelemetry.addLine("Intake: ${intake.state}")
-        // panelsTelemetry.addLine("Shooter: ${shooter.state}")
+        // Subsystems
+        panelsTelemetry.addLine("Intake: ${Intake.getState()}")
+        panelsTelemetry.addLine("Gate: ${Gate.getState()}")
 
         // Update both Driver Station and Panels
         panelsTelemetry.push(telemetry)
