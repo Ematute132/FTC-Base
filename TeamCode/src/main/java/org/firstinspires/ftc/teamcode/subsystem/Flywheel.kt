@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.subsystem
 
 import com.bylazar.configurables.annotations.Configurable
+import com.qualcomm.robotcore.hardware.VoltageSensor
 import dev.nextftc.control.KineticState
 import dev.nextftc.control.builder.controlSystem
 import dev.nextftc.control.feedback.PIDCoefficients
@@ -16,6 +17,15 @@ import dev.nextftc.hardware.impl.MotorEx
 object Flywheel : Subsystem {
     // Hardware
     private var motor = MotorEx("flywheel")
+
+    // Voltage compensation
+    private val battery: VoltageSensor by lazy {
+        hardwareMap.get(VoltageSensor::class.java, "Control Hub")
+    }
+    private const val V_NOMINAL = 12.0
+    private var voltFilt = 12.0
+    private const val ALPHA_VOLT = 0.08
+    @JvmField var voltageCompEnabled = true
 
     // ============================================
     // TUNABLE PID VALUES (via Panels)
@@ -55,6 +65,11 @@ object Flywheel : Subsystem {
     private val MS_PER_MINUTE = 60000.0
 
     override fun periodic() {
+        // Voltage compensation
+        val voltRaw = battery.voltage.coerceAtLeast(9.0)
+        voltFilt += ALPHA_VOLT * (voltRaw - voltFilt)
+        val voltageRatio = V_NOMINAL / voltFilt
+
         // Get current velocity in RPM
         val currentVelocity = motor.velocity
         val currentRPM = (currentVelocity * MS_PER_MINUTE) / TICKS_PER_REV
@@ -65,7 +80,12 @@ object Flywheel : Subsystem {
             val targetTicksPerSec = (targetRPM * TICKS_PER_REV) / MS_PER_MINUTE
             
             controller.goal = KineticState(targetTicksPerSec)
-            val power = controller.calculate(motor.state)
+            var power = controller.calculate(motor.state)
+            
+            // Apply voltage compensation
+            if (voltageCompEnabled) {
+                power *= voltageRatio
+            }
             
             motor.power = power.coerceIn(-maxPower, maxPower)
         }
