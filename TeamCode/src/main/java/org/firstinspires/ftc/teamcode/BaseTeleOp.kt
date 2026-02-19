@@ -38,10 +38,6 @@ class BaseTeleOp : NextFTCOpMode() {
     }
 
     override fun onInit() {
-        // Initialize subsystems
-        Gate.initialize(hardwareMap)
-        Intake.initialize(hardwareMap)
-
         // Initialize Pedro Pathing - set starting pose
         follower.setStartingPose(Pose(0.0, 0.0, 0.0))
 
@@ -68,17 +64,19 @@ class BaseTeleOp : NextFTCOpMode() {
         // Intake control with triggers
         // Right trigger = intake
         Gamepads.gamepad1.rightTrigger.greaterThan(0.0)
-            .whenBecomesTrue { Intake.run() }
-            .whenBecomesFalse { Intake.stop() }
+            .whenBecomesTrue { Intake.run.schedule() }
+            .whenBecomesFalse { Intake.stop.schedule() }
 
         // Left trigger = outtake
         Gamepads.gamepad1.leftTrigger.greaterThan(0.0)
-            .whenBecomesTrue { Intake.outtake() }
-            .whenBecomesFalse { Intake.stop() }
+            .whenBecomesTrue { Intake.outtake.schedule() }
+            .whenBecomesFalse { Intake.stop.schedule() }
 
         // Right bumper = toggle gate
         Gamepads.gamepad1.rightBumper
-            .whenBecomesTrue { Gate.toggle() }
+            .toggleOnBecomesTrue()
+            .whenBecomesTrue { Gate.open.schedule() }
+            .whenBecomesFalse { Gate.close.schedule() }
     }
 
     override fun onUpdate() {
@@ -100,6 +98,6 @@ class BaseTeleOp : NextFTCOpMode() {
         panelsTelemetry.addLine("Gate: ${Gate.getState()}")
 
         // Update both Driver Station and Panels
-        panelsTelemetry.push(telemetry)
+        panelsTelemetry.update(telemetry)
     }
 }

@@ -1,19 +1,15 @@
 package org.firstinspires.ftc.teamcode.subsystem
 
-import com.qualcomm.robotcore.hardware.HardwareMap
-import com.qualcomm.robotcore.hardware.Servo
+import dev.nextftc.core.commands.utility.InstantCommand
 import dev.nextftc.core.subsystems.Subsystem
+import dev.nextftc.hardware.impl.ServoEx
 
 /**
- * Gate subsystem
- * Controls gate servo - opens and closes to let balls through
+ * Gate subsystem for controlling ball flow to shooter.
  */
 object Gate : Subsystem {
-    private lateinit var servo: Servo
-
-    // Positions
-    const val POSITION_CLOSED = 0.0
-    const val POSITION_OPEN = 1.0
+    private var servo = ServoEx("gate", 0.01)
+    private var position = 0.0
 
     // State
     enum class State {
@@ -23,30 +19,19 @@ object Gate : Subsystem {
     var currentState = State.CLOSED
         private set
 
-    override fun initialize(hardwareMap: HardwareMap) {
-        servo = hardwareMap.get(Servo::class.java, "gate")
-        servo.direction = Servo.Direction.FORWARD
-        
-        // Start closed
-        close()
+    override fun periodic() {
+        servo.position = position
     }
 
-    fun open() {
-        servo.position = POSITION_OPEN
+    // ==================== COMMANDS ====================
+    val open = InstantCommand {
+        position = 0.0
         currentState = State.OPEN
     }
 
-    fun close() {
-        servo.position = POSITION_CLOSED
+    val close = InstantCommand {
+        position = 1.0
         currentState = State.CLOSED
-    }
-
-    fun toggle() {
-        if (currentState == State.CLOSED) {
-            open()
-        } else {
-            close()
-        }
     }
 
     fun getState(): State = currentState

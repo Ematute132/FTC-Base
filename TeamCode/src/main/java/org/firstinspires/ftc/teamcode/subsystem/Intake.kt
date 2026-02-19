@@ -1,15 +1,16 @@
 package org.firstinspires.ftc.teamcode.subsystem
 
-import com.qualcomm.robotcore.hardware.DcMotor
-import com.qualcomm.robotcore.hardware.HardwareMap
+import dev.nextftc.core.commands.utility.InstantCommand
 import dev.nextftc.core.subsystems.Subsystem
+import dev.nextftc.hardware.impl.MotorEx
+import dev.nextftc.hardware.impl.ServoEx
 
 /**
  * Intake subsystem
  * Controls intake motor - intakes (positive) and outtakes (negative)
  */
 object Intake : Subsystem {
-    private lateinit var motor: DcMotor
+    private var motor = MotorEx("intake")
 
     // Power settings
     var intakePower = 1.0
@@ -23,23 +24,22 @@ object Intake : Subsystem {
     var currentState = State.STOPPED
         private set
 
-    override fun initialize(hardwareMap: HardwareMap) {
-        motor = hardwareMap.get(DcMotor::class.java, "intake")
-        motor.direction = DcMotor.Direction.FORWARD
-        motor.mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
+    override fun periodic() {
+        // Motor updates automatically through MotorEx
     }
 
-    fun run() {
+    // ==================== COMMANDS ====================
+    val run = InstantCommand {
         motor.power = intakePower
         currentState = State.INTAKING
     }
 
-    fun outtake() {
+    val outtake = InstantCommand {
         motor.power = outtakePower
         currentState = State.OUTTAKING
     }
 
-    fun stop() {
+    val stop = InstantCommand {
         motor.power = 0.0
         currentState = State.STOPPED
     }
