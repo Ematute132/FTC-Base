@@ -1,8 +1,9 @@
 package org.firstinspires.ftc.teamcode
 
-import com.bylazar.telemetry.TelemetryManager
+import com.bylazar.telemetry.PanelsTelemetry
 import com.pedropathing.geometry.Pose
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
+import dev.nextftc.core.components.SubsystemComponent
 import dev.nextftc.ftc.Gamepads
 import dev.nextftc.ftc.NextFTCOpMode
 import dev.nextftc.extensions.pedro.PedroComponent
@@ -19,10 +20,15 @@ import org.firstinspires.ftc.teamcode.subsystem.Intake
 @TeleOp(name = "Base TeleOp", group = "TeleOp")
 class BaseTeleOp : NextFTCOpMode() {
 
-    // Panels telemetry for live dashboard
-    private val panelsTelemetry: TelemetryManager by lazy { 
-        TelemetryManager() 
+    init {
+        addComponents(
+            SubsystemComponent(Intake),
+            SubsystemComponent(Gate)
+        )
     }
+
+    // Panels telemetry for live dashboard
+    private val panelsTelemetry by lazy { PanelsTelemetry.telemetry }
 
     // Pedro Pathing follower
     private val follower by lazy { PedroComponent.follower }
@@ -64,19 +70,17 @@ class BaseTeleOp : NextFTCOpMode() {
         // Intake control with triggers
         // Right trigger = intake
         Gamepads.gamepad1.rightTrigger.greaterThan(0.0)
-            .whenBecomesTrue { Intake.run.schedule() }
-            .whenBecomesFalse { Intake.stop.schedule() }
+            .whenBecomesTrue { Intake.intake }
+            .whenBecomesFalse { Intake.off }
 
         // Left trigger = outtake
         Gamepads.gamepad1.leftTrigger.greaterThan(0.0)
-            .whenBecomesTrue { Intake.outtake.schedule() }
-            .whenBecomesFalse { Intake.stop.schedule() }
+            .whenBecomesTrue { Intake.reverse }
+            .whenBecomesFalse { Intake.off }
 
-        // Right bumper = toggle gate
+        // Right bumper = open gate
         Gamepads.gamepad1.rightBumper
-            .toggleOnBecomesTrue()
-            .whenBecomesTrue { Gate.open.schedule() }
-            .whenBecomesFalse { Gate.close.schedule() }
+            .whenBecomesTrue { Gate.open }
     }
 
     override fun onUpdate() {
@@ -95,7 +99,6 @@ class BaseTeleOp : NextFTCOpMode() {
 
         // Subsystems
         panelsTelemetry.addLine("Intake: ${Intake.getState()}")
-        panelsTelemetry.addLine("Gate: ${Gate.getState()}")
 
         // Update both Driver Station and Panels
         panelsTelemetry.update(telemetry)

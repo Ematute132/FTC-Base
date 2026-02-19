@@ -3,7 +3,7 @@ package org.firstinspires.ftc.teamcode.subsystem
 import dev.nextftc.core.commands.utility.InstantCommand
 import dev.nextftc.core.subsystems.Subsystem
 import dev.nextftc.hardware.impl.MotorEx
-import dev.nextftc.hardware.impl.ServoEx
+import dev.nextftc.hardware.powerable.SetPower
 
 /**
  * Intake subsystem
@@ -24,25 +24,10 @@ object Intake : Subsystem {
     var currentState = State.STOPPED
         private set
 
-    override fun periodic() {
-        // Motor updates automatically through MotorEx
-    }
-
-    // ==================== COMMANDS ====================
-    val run = InstantCommand {
-        motor.power = intakePower
-        currentState = State.INTAKING
-    }
-
-    val outtake = InstantCommand {
-        motor.power = outtakePower
-        currentState = State.OUTTAKING
-    }
-
-    val stop = InstantCommand {
-        motor.power = 0.0
-        currentState = State.STOPPED
-    }
+    // Commands using SetPower
+    var intake = SetPower(motor, intakePower).also { currentState = State.INTAKING }
+    var reverse = SetPower(motor, outtakePower).also { currentState = State.OUTTAKING }
+    var off = SetPower(motor, 0.0).also { currentState = State.STOPPED }
 
     fun getState(): State = currentState
 }
