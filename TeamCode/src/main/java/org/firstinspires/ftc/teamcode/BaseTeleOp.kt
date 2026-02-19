@@ -1,15 +1,13 @@
 package org.firstinspires.ftc.teamcode
 
-import com.bylazar.ftcontrol.panels.Panels
-import com.bylazar.ftcontrol.panels.integration.TelemetryManager
+import com.bylazar.telemetry.TelemetryManager
+import com.pedropathing.geometry.Pose
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
-import com.qualcomm.robotcore.hardware.HardwareMap
 import dev.nextftc.ftc.Gamepads
 import dev.nextftc.ftc.NextFTCOpMode
 import dev.nextftc.extensions.pedro.PedroComponent
 import dev.nextftc.extensions.pedro.PedroDriverControlled
 import dev.nextftc.hardware.driving.DriverControlledCommand
-import org.firstinspires.ftc.teamcode.pedroPathing.Constants
 
 /**
  * Base TeleOp for FTC Robot
@@ -20,7 +18,9 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants
 class BaseTeleOp : NextFTCOpMode() {
 
     // Panels telemetry for live dashboard
-    private val panelsTelemetry: TelemetryManager by lazy { Panels.getTelemetry() }
+    private val panelsTelemetry: TelemetryManager by lazy { 
+        TelemetryManager() 
+    }
 
     // Robot subsystems - add your subsystems here
     // private lateinit var drive: Drive
@@ -40,23 +40,20 @@ class BaseTeleOp : NextFTCOpMode() {
         )
     }
 
-    override fun onInitButtonPressed() {
+    override fun onInit() {
         // Initialize subsystems here
         // drive = Drive(hardwareMap)
         // intake = Intake(hardwareMap)
         // shooter = Shooter(hardwareMap)
 
-        // Initialize Pedro Pathing
-        follower.localizer
+        // Initialize Pedro Pathing - set starting pose
+        follower.setStartingPose(Pose(0.0, 0.0, 0.0))
 
         // Send init message to panels
-        panelsTelemetry.debug("BaseTeleOp Initialized")
+        panelsTelemetry.addLine("BaseTeleOp Initialized")
     }
 
     override fun onStartButtonPressed() {
-        // Set starting pose (adjust for your robot)
-        // follower.setStartingPose(Pose(0.0, 0.0, 0.0))
-
         // Start drivetrain
         drivetrain.schedule()
 
@@ -99,15 +96,15 @@ class BaseTeleOp : NextFTCOpMode() {
 
     private fun updateTelemetry() {
         // Robot position
-        panelsTelemetry.debug("X: %.1f".format(follower.pose.x))
-        panelsTelemetry.debug("Y: %.1f".format(follower.pose.y))
-        panelsTelemetry.debug("Heading: %.1f".format(Math.toDegrees(follower.pose.heading)))
+        panelsTelemetry.addLine("X: %.1f".format(follower.pose.x))
+        panelsTelemetry.addLine("Y: %.1f".format(follower.pose.y))
+        panelsTelemetry.addLine("Heading: %.1f".format(Math.toDegrees(follower.pose.heading)))
 
         // Debug info - customize for your robot
-        // panelsTelemetry.debug("Intake: ${intake.state}")
-        // panelsTelemetry.debug("Shooter: ${shooter.state}")
+        // panelsTelemetry.addLine("Intake: ${intake.state}")
+        // panelsTelemetry.addLine("Shooter: ${shooter.state}")
 
         // Update both Driver Station and Panels
-        panelsTelemetry.update(telemetry)
+        panelsTelemetry.push(telemetry)
     }
 }
