@@ -1,115 +1,141 @@
 package org.firstinspires.ftc.teamcode.subsystem
 
 import com.bylazar.configurables.annotations.Configurable
+import com.bylazar.telemetry.PanelsTelemetry
 import com.qualcomm.robotcore.hardware.VoltageSensor
+import dev.nextftc.control.ControlSystem
 import dev.nextftc.control.KineticState
 import dev.nextftc.control.builder.controlSystem
 import dev.nextftc.control.feedback.PIDCoefficients
-import dev.nextftc.control.feedforward.BasicFeedforward
+import dev.nextftc.control.feedforward.BasicFeedforwardParameters
+import dev.nextftc.core.commands.Command
+import dev.nextftc.core.commands.utility.InstantCommand
 import dev.nextftc.core.subsystems.Subsystem
 import dev.nextftc.hardware.impl.MotorEx
+import dev.nextftc.ftc.ActiveOpMode
+import java.util.function.Supplier
 
 /**
- * Flywheel subsystem
- * Uses velocity PID + feedforward for consistent shooter speed
+ * Flywheel subsystem with voltage compensation
  */
 @Configurable
 object Flywheel : Subsystem {
-    // Hardware
-    private var motor = MotorEx("flywheel")
-
-    // Voltage compensation
+    // Hardware - 2 Motors
+    private val motor1 = MotorEx("Fly1").floatMode()
+    private val motor2 = MotorEx("Fly2").floatMode()
+    
+    // Voltage sensor for compensation
     private val battery: VoltageSensor by lazy {
-        hardwareMap.get(VoltageSensor::class.java, "Control Hub")
+        ActiveOpMode.hardwareMap.get(VoltageSensor::class.java, "Control Hub")
     }
+    
+    // PID & FF Coefficients
+    @JvmField var ffCoefficients = BasicFeedforwardParameters(0.003, 0.08, 0.0)
+    @JvmField var pidCoefficients = PIDCoefficients(0.009, 0.0, 0.01)
+    
+    // Control System
+    val controller: ControlSystem = controlSystem {
+        basicFF(ffCoefficients)
+        velPid(pidCoefficients)
+    }
+    
+    // Voltage compensation constants
     private const val V_NOMINAL = 12.0
     private var voltFilt = 12.0
     private const val ALPHA_VOLT = 0.08
+    
+    // Voltage comp toggle
     @JvmField var voltageCompEnabled = true
-
-    // ============================================
-    // TUNABLE PID VALUES (via Panels)
-    // ============================================
-    @JvmField var kP = 0.02
-    @JvmField var kI = 0.0
-    @JvmField var kD = 0.0
     
-    // Feedforward values
-    @JvmField var kV = 0.1  // Velocity feedforward
-    @JvmField var kA = 0.0  // Acceleration feedforward
-    @JvmField var kS = 0.0  // Static friction
-
-    // Target RPM
-    @JvmField var targetRPM = 3000.0
+    // Target velocity
+    private var targetVelocity = 0.0
     
-    // Max power
-    @JvmField var maxPower = 1.0
-
-    // Control system
-    private val controller = controlSystem {
-        velocityPid(PIDCoefficients(kP, kI, kD))
-        feedforward(BasicFeedforward(kV, kA, kS))
-    }
-
-    // State
-    enum class State {
-        RUNNING, STOPPED
+    // ==================== VELOCITY PRESETS ====================
+    
+    /**
+     * Set flywheel velocity
+     */
+    fun setVelocity(speed: Double) {
+        targetVelocity = speed
+        controller.goal = KineticState(0.0, speed)
     }
     
-    var currentState = State.STOPPED
-        private set
-
-    // RPM conversion (depends on your motor/encoder)
-    // Adjust TICKS_PER_REV for your setup
-    private val TICKS_PER_REV = 537.7  // GoBilda Yellow Jacket
-    private val MS_PER_MINUTE = 60000.0
-
+    // Presets
+    val off = InstantCommand { setVelocity(0.0) }
+    val close = InstantCommand { setVelocity(1000.0) }
+    val mid = InstantCommand { setVelocity(1250.0) }
+    val far = InstantCommand { setVelocity(1500.0) }
+    val max = InstantCommand { setVelocity(1500.0) }
+    val maxAuto = InstantCommand { setVelocity(1600.0) }
+    val idle = InstantCommand { setVelocity(-300.0) }
+    val runHigh = InstantCommand { setVelocity(2000.0) }
+    
+    // ==================== MOTOR CONTROL ====================
+    
+    private fun setMotorPowers(power: Double) {
+        val clampedPower = power.coerceIn(-0.85, 0.85)
+        motor1.power = clampedPower
+        motor2.power = clampedPower
+    }
+    
+    // ==================== PERIODIC ====================
+    
     override fun periodic() {
-        // Voltage compensation
+        // Get voltage and filter it
         val voltRaw = battery.voltage.coerceAtLeast(9.0)
         voltFilt += ALPHA_VOLT * (voltRaw - voltFilt)
+        
+        // Calculate voltage ratio
         val voltageRatio = V_NOMINAL / voltFilt
-
-        // Get current velocity in RPM
-        val currentVelocity = motor.velocity
-        val currentRPM = (currentVelocity * MS_PER_MINUTE) / TICKS_PER_REV
-
-        // Run PID controller if running
-        if (currentState == State.RUNNING) {
-            // Convert RPM to ticks per second for controller
-            val targetTicksPerSec = (targetRPM * TICKS_PER_REV) / MS_PER_MINUTE
-            
-            controller.goal = KineticState(targetTicksPerSec)
-            var power = controller.calculate(motor.state)
-            
-            // Apply voltage compensation
-            if (voltageCompEnabled) {
-                power *= voltageRatio
-            }
-            
-            motor.power = power.coerceIn(-maxPower, maxPower)
+        
+        // Calculate base power from controller
+        val rawPower = controller.calculate(motor1.state)
+        
+        // Apply voltage compensation
+        val finalPower = if (voltageCompEnabled) {
+            (rawPower * voltageRatio).coerceIn(-0.85, 0.85)
+        } else {
+            rawPower.coerceIn(-0.85, 0.85)
+        }
+        
+        setMotorPowers(finalPower)
+        
+        // Telemetry
+        PanelsTelemetry.telemetry.addData("Flywheel Power", finalPower)
+        PanelsTelemetry.telemetry.addData("Target Vel", targetVelocity)
+        PanelsTelemetry.telemetry.addData("Actual Vel", motor1.velocity)
+        PanelsTelemetry.telemetry.addData("Voltage", voltFilt)
+        PanelsTelemetry.telemetry.addData("Voltage Comp", voltageRatio)
+    }
+    
+    // ==================== COMMANDS ====================
+    
+    /**
+     * Manual control - override with direct power
+     */
+    class Manual(private val shooterPower: Supplier<Double>) : Command() {
+        override val isDone = false
+        init { requires(Flywheel) }
+        override fun update() {
+            Flywheel.setMotorPowers(shooterPower.get())
         }
     }
-
-    // ============================================
-    // COMMANDS
-    // ============================================
-    fun setTargetRPM(rpm: Double) {
-        targetRPM = rpm
-        currentState = State.RUNNING
+    
+    /**
+     * Check if at target velocity
+     */
+    fun isAtTarget(): Boolean {
+        return ((targetVelocity - 20.0) < motor1.velocity) && 
+               ((targetVelocity + 40.0) > motor1.velocity)
     }
-
-    fun stop() {
-        motor.power = 0.0
-        currentState = State.STOPPED
-    }
-
-    fun getTargetRPM(): Double = targetRPM
-
-    fun getCurrentRPM(): Double {
-        val currentVelocity = motor.velocity
-        return (currentVelocity * MS_PER_MINUTE) / TICKS_PER_REV
-    }
-
-    fun getState(): State = currentState
+    
+    /**
+     * Get current velocity
+     */
+    fun getVelocity(): Double = motor1.velocity
+    
+    /**
+     * Get target velocity
+     */
+    fun getTargetVelocity(): Double = targetVelocity
 }
